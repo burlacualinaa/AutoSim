@@ -1,0 +1,14 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/DrivingSimulator.unity
+    guid: 5c689d4f177b30f4ebce0bbd0fd2e477
+  m_configObjects:
+    com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 0427cf673a0a2ae47814057594c8b987, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: b4896668d7e550a4e834ee080011c245, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 666ef6c6ef6847c4daefe4b9b028f5af, type: 2}
