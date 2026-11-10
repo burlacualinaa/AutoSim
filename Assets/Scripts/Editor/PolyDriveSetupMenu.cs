@@ -74,18 +74,25 @@ namespace AutoSim.EditorTools
             Camera cam = Camera.main;
             if (cam != null)
             {
+                var xr = cam.GetComponent<XRRigSetup>();
+                if (xr != null)
+                {
+                    Undo.RecordObject(xr, "Configure XR Rig");
+                    // Ensure driver seat offset matches Bavaria Sport front driver seat
+                    var seatOffsetProp = new SerializedObject(xr).FindProperty("driverSeatOffset");
+                    if (seatOffsetProp != null)
+                    {
+                        seatOffsetProp.vector3Value = new Vector3(-0.364f, 1.12f, 0.05f);
+                        seatOffsetProp.serializedObject.ApplyModifiedProperties();
+                    }
+                    xr.SetEditorCockpitView(true);
+                }
+
                 var follow = cam.GetComponent<SimpleFollowCamera>();
                 if (follow != null)
                 {
                     Undo.RecordObject(follow, "Set Follow Camera Target");
                     follow.Target = car.transform;
-                }
-
-                var xr = cam.GetComponent<XRRigSetup>();
-                if (xr != null)
-                {
-                    Undo.RecordObject(xr, "Configure XR Rig");
-                    xr.SetEditorCockpitView(true);
                 }
             }
 

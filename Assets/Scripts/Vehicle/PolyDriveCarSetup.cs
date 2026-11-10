@@ -33,7 +33,7 @@ namespace AutoSim.Vehicle
 
         [Header("Driver View & Steering")]
         [Tooltip("Driver eye anchor position relative to this car (X=left/right, Y=height, Z=forward/back).")]
-        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.15f, -0.15f);
+        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.12f, 0.05f);
 
         [Tooltip("Maximum steering wheel rotation degrees lock-to-lock.")]
         [SerializeField] private float maxSteerDegrees = 450f;

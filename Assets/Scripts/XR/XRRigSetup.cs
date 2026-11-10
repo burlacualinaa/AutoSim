@@ -7,14 +7,14 @@ namespace AutoSim.XR
     /// <summary>
     /// Configures the camera rig for HoloLens 2 AR and Editor simulator driving.
     /// Anchors the camera to the vehicle's driver seat, enables optical pass-through,
-    /// hides obstructions, and provides cockpit view toggle.
+    /// hides obstructions, and provides in-cockpit driver seat view toggle.
     /// </summary>
     [AddComponentMenu("AutoSim/XR/XR Rig Setup")]
     public class XRRigSetup : MonoBehaviour
     {
         [Header("Driver Seat Anchor")]
         [Tooltip("Offset of the driver's eyes relative to the vehicle (X=left/right, Y=height, Z=front/back).")]
-        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.38f, 1.16f, -0.65f);
+        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.12f, 0.05f);
 
         [Header("AR Pass-through Settings")]
         [Tooltip("Make camera background solid black (0,0,0,0) for HoloLens 2 transparent display.")]
@@ -72,7 +72,7 @@ namespace AutoSim.XR
 
             if (isCockpitViewInEditor)
             {
-                var vehicle = FindObjectOfType<VehicleController>();
+                var vehicle = FindActiveVehicle();
                 if (vehicle != null)
                 {
                     Transform seatAnchor = vehicle.transform.Find("DriverSeatAnchor");
@@ -84,23 +84,24 @@ namespace AutoSim.XR
                         anchorObj.transform.localRotation = Quaternion.identity;
                         seatAnchor = anchorObj.transform;
                     }
-                    else
-                    {
-                        seatAnchor.localPosition = driverSeatOffset;
-                    }
 
                     if (followCam != null) followCam.enabled = false;
                     cam.transform.SetParent(seatAnchor, false);
                     cam.transform.localPosition = Vector3.zero;
                     cam.transform.localRotation = Quaternion.identity;
-                    Debug.Log("[XRRigSetup] In-Car Cockpit Driver View Active. Press [C] to switch to Chase Camera.");
+                    Debug.Log($"[XRRigSetup] In-Car Driver Seat View Active on {vehicle.name}. Press [C] to switch to Chase Camera.");
                 }
             }
             else
             {
                 cam.transform.SetParent(null);
-                if (followCam != null) followCam.enabled = true;
-                Debug.Log("[XRRigSetup] Chase Camera Active. Press [C] to switch to In-Car Cockpit View.");
+                if (followCam != null)
+                {
+                    var vehicle = FindActiveVehicle();
+                    if (vehicle != null) followCam.Target = vehicle.transform;
+                    followCam.enabled = true;
+                }
+                Debug.Log("[XRRigSetup] Chase Camera Active. Press [C] to switch to In-Car Driver Seat View.");
             }
         }
 
@@ -119,14 +120,12 @@ namespace AutoSim.XR
                     cam.clearFlags = CameraClearFlags.SolidColor;
                     cam.backgroundColor = new Color(0f, 0f, 0f, 0f);
                 }
-                cam.nearClipPlane = 0.05f; // reduced near clip for close cockpit elements
+                cam.nearClipPlane = 0.05f;
             }
 
-            // Find VehicleController in scene
-            var vehicle = FindObjectOfType<VehicleController>();
+            var vehicle = FindActiveVehicle();
             if (vehicle != null)
             {
-                // Hide old solid cabin cube so driver has unobstructed view
                 if (hideCabinOnHoloLens)
                 {
                     Transform cabin = vehicle.transform.Find("Body_Cabin");
@@ -137,7 +136,6 @@ namespace AutoSim.XR
                     }
                 }
 
-                // Create or update driver seat anchor on the vehicle
                 Transform seatAnchor = vehicle.transform.Find("DriverSeatAnchor");
                 if (seatAnchor == null)
                 {
@@ -147,27 +145,30 @@ namespace AutoSim.XR
                     anchorObj.transform.localRotation = Quaternion.identity;
                     seatAnchor = anchorObj.transform;
                 }
-                else
-                {
-                    seatAnchor.localPosition = driverSeatOffset;
-                }
 
-                // Parent the Camera Rig to the seat anchor so driver moves with the car
                 if (cam != null)
                 {
                     var followCam = cam.GetComponent<SimpleFollowCamera>();
-                    if (followCam != null)
-                    {
-                        followCam.enabled = false;
-                    }
+                    if (followCam != null) followCam.enabled = false;
 
                     cam.transform.SetParent(seatAnchor, false);
                     cam.transform.localPosition = Vector3.zero;
                     cam.transform.localRotation = Quaternion.identity;
                 }
 
-                Debug.Log($"[XRRigSetup] HoloLens 2 camera anchored to vehicle driver seat at {driverSeatOffset}.");
+                Debug.Log($"[XRRigSetup] HoloLens 2 camera anchored to {vehicle.name} driver seat.");
             }
+        }
+
+        private VehicleController FindActiveVehicle()
+        {
+            var all = FindObjectsOfType<VehicleController>();
+            foreach (var v in all)
+            {
+                if (v.gameObject.activeInHierarchy)
+                    return v;
+            }
+            return all.Length > 0 ? all[0] : null;
         }
     }
 }
