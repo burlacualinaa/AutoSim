@@ -14,16 +14,16 @@ namespace AutoSim.Vehicle
         [SerializeField] private Transform target;
 
         [Tooltip("Offset relative to vehicle orientation (X=side, Y=height, Z=distance behind).")]
-        [SerializeField] private Vector3 offset = new Vector3(0f, 2.5f, -6f);
+        [SerializeField] private Vector3 offset = new Vector3(0f, 2.3f, -6.8f);
 
         [Tooltip("How smoothly the camera follows position.")]
-        [SerializeField] private float positionDamping = 5f;
+        [SerializeField] private float positionDamping = 6f;
 
         [Tooltip("How smoothly the camera rotates toward vehicle forward.")]
-        [SerializeField] private float rotationDamping = 5f;
+        [SerializeField] private float rotationDamping = 6f;
 
         [Tooltip("Look-at target height offset above vehicle origin.")]
-        [SerializeField] private float lookAtHeight = 1.2f;
+        [SerializeField] private float lookAtHeight = 1.1f;
 
         public Transform Target
         {

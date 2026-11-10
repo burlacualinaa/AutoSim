@@ -2,6 +2,7 @@
 // Reads input from any IInputProvider and drives a rear-wheel-drive car.
 using UnityEngine;
 using AutoSim.Input;
+using AutoSim.Environment;
 
 namespace AutoSim.Vehicle
 {
@@ -198,6 +199,12 @@ namespace AutoSim.Vehicle
 #endif
 
                 Debug.Log($"[VehicleController] Active Input Provider bound to: {(ActiveInputProvider != null ? ActiveInputProvider.ProviderName : "NULL")}");
+            }
+
+            // Ensure realistic 3D interior cockpit is present
+            if (GetComponent<CockpitSetup>() == null)
+            {
+                gameObject.AddComponent<CockpitSetup>();
             }
         }
 

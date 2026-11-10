@@ -97,8 +97,8 @@ namespace AutoSim.Input
         [Tooltip("Enable detailed diagnostic logging in Unity Console upon device discovery.")]
         [SerializeField] private bool verboseLogging = true;
 
-        [Tooltip("Show on-screen debug interface displaying wheel & pedal values.")]
-        [SerializeField] private bool showDebugOverlay = true;
+        [Tooltip("Show on-screen debug interface displaying wheel & pedal values (press F3 to toggle).")]
+        [SerializeField] private bool showDebugOverlay = false;
 
         [Tooltip("Keyboard shortcut to toggle debug overlay.")]
         [SerializeField] private KeyCode toggleDebugKey = KeyCode.F3;

@@ -209,6 +209,9 @@ namespace AutoSim.Editor
             vehicle.AddComponent<Speedometer>();
             vehicle.AddComponent<SpeedometerUI>();
 
+            // Cockpit & Interior Simulation
+            vehicle.AddComponent<CockpitSetup>();
+
             return vehicle;
         }
 
