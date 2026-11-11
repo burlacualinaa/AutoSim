@@ -2,18 +2,15 @@
 // Monitors suspension variations, vertical acceleration jolts, and collision impulses in FixedUpdate.
 // Plays clear, short haptic impulses with strict cooldown and duration control.
 using System;
+using System.Runtime.InteropServices;
 using UnityEngine;
-
-#if !UNITY_WSA || UNITY_EDITOR
-using AutoSim.CompanionApp;
-#endif
 
 namespace AutoSim.Vehicle
 {
     /// <summary>
     /// Delivers realistic haptic impulses to the Logitech G920 steering wheel
     /// when the vehicle crosses road bumps, impacts curbs, or collides with obstacles.
-    /// Runs exclusively on the PC host (UWP-safe).
+    /// Runs on Windows PC; safely stubs on UWP/HoloLens.
     /// </summary>
     [AddComponentMenu("AutoSim/Vehicle/Vehicle Force Feedback")]
     [RequireComponent(typeof(VehicleController))]
@@ -73,20 +70,16 @@ namespace AutoSim.Vehicle
         {
             DiscoverWheels();
 
-#if !UNITY_WSA || UNITY_EDITOR
-            // Apply subtle centering spring to maintain authentic wheel weight
+            // Apply subtle centering spring to maintain authentic wheel weight on PC
             if (enableFFB)
             {
-                LogitechSDKWrapper.PlayCenteringSpringSafe(0, 0, 40, 30);
+                LogitechFFBNative.PlayCenteringSpring(0, 0, 40, 30);
             }
-#endif
         }
 
         private void OnDisable()
         {
-#if !UNITY_WSA || UNITY_EDITOR
-            LogitechSDKWrapper.StopAllForcesSafe(0);
-#endif
+            LogitechFFBNative.StopAllForces(0);
         }
 
         private void FixedUpdate()
@@ -104,9 +97,7 @@ namespace AutoSim.Vehicle
                 if (activePulseTimer <= 0f)
                 {
                     isPulseActive = false;
-#if !UNITY_WSA || UNITY_EDITOR
-                    LogitechSDKWrapper.StopBumpyRoadSafe(0);
-#endif
+                    LogitechFFBNative.StopBumpyRoad(0);
                 }
             }
 
@@ -226,13 +217,112 @@ namespace AutoSim.Vehicle
         {
             magnitudePercent = Mathf.Clamp(magnitudePercent, 10, 100);
 
-#if !UNITY_WSA || UNITY_EDITOR
-            LogitechSDKWrapper.PlayImpactForceSafe(0, magnitudePercent);
-#endif
+            LogitechFFBNative.PlayImpactForce(0, magnitudePercent);
 
             isPulseActive = true;
             activePulseTimer = impulseDuration;
             cooldownTimer = cooldownTime;
+        }
+
+        // ──────────────────────────── Direct P/Invoke FFB Safe Layer ──────────────────
+
+        /// <summary>
+        /// Safe P/Invoke wrapper for Logitech Steering Wheel SDK Force Feedback.
+        /// Fully self-contained to eliminate asmdef dependency errors.
+        /// </summary>
+        private static class LogitechFFBNative
+        {
+            private const string DLL = "LogitechSteeringWheelEnginesWrapper";
+
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiIsConnected(int index);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiPlayFrontalCollisionForce(int index, int magnitudePercentage);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiPlayBumpyRoadEffect(int index, int magnitudePercentage);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiStopBumpyRoadEffect(int index);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiPlaySpringForce(int index, int offset, int saturation, int coefficient);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiStopSpringForce(int index);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiStopConstantForce(int index);
+
+            private static bool? _isDllPresent = null;
+
+            public static bool IsDllAvailable
+            {
+                get
+                {
+                    if (_isDllPresent.HasValue) return _isDllPresent.Value;
+                    try
+                    {
+                        _isDllPresent = LogiIsConnected(0);
+                        return _isDllPresent.Value;
+                    }
+                    catch
+                    {
+                        _isDllPresent = false;
+                        return false;
+                    }
+                }
+            }
+
+            public static bool PlayImpactForce(int index, int magnitudePercentage)
+            {
+                if (!IsDllAvailable) return false;
+                try { return LogiPlayFrontalCollisionForce(index, Mathf.Clamp(magnitudePercentage, 0, 100)); }
+                catch { return false; }
+            }
+
+            public static bool StopBumpyRoad(int index)
+            {
+                if (!IsDllAvailable) return false;
+                try { return LogiStopBumpyRoadEffect(index); }
+                catch { return false; }
+            }
+
+            public static bool PlayCenteringSpring(int index, int offset, int saturation, int coefficient)
+            {
+                if (!IsDllAvailable) return false;
+                try { return LogiPlaySpringForce(index, offset, saturation, coefficient); }
+                catch { return false; }
+            }
+
+            public static void StopAllForces(int index)
+            {
+                if (!IsDllAvailable) return;
+                try
+                {
+                    LogiStopBumpyRoadEffect(index);
+                    LogiStopSpringForce(index);
+                    LogiStopConstantForce(index);
+                }
+                catch { }
+            }
+#else
+            // Safe stubs for UWP / HoloLens 2 ARM64
+            public static bool IsDllAvailable => false;
+            public static bool PlayImpactForce(int index, int magnitudePercentage) => false;
+            public static bool StopBumpyRoad(int index) => false;
+            public static bool PlayCenteringSpring(int index, int offset, int saturation, int coefficient) => false;
+            public static void StopAllForces(int index) { }
+#endif
         }
     }
 }
