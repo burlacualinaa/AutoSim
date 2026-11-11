@@ -1,89 +1,90 @@
-// BuildingGenerator.cs — Generates simple box buildings along both sides of the road.
+// BuildingGenerator.cs — High-performance procedural urban city architecture.
+// Spawns varied modern buildings (skyscrapers, commercial offices, apartments, storefronts)
+// along the 2.5 km boulevard with shared batched materials for high FPS.
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace AutoSim.Environment
 {
     /// <summary>
-    /// Spawns randomised box buildings on both sides of the road.
-    /// Buildings have varied sizes, colours, and optional window patterns.
-    /// All generated objects are parented under this transform for easy cleanup.
+    /// Generates diverse modern urban buildings along both sides of the 2.5 km boulevard.
+    /// Features varied architectural silhouettes (high-rise glass towers, mid-rise commercial,
+    /// residential apartments, storefronts, and rooftop mechanicals).
+    /// Uses cached shared materials for maximum rendering performance on PC and HoloLens 2.
     /// </summary>
     [AddComponentMenu("AutoSim/Environment/Building Generator")]
     public class BuildingGenerator : MonoBehaviour
     {
         // ──────────────────────────── Inspector Parameters ────────────────────────────
 
-        [Header("Building Placement")]
-        [Tooltip("Distance from the road centre to the nearest building face (metres).")]
-        [SerializeField] private float buildingSetback = 15f;
+        [Header("Boulevard Placement")]
+        [Tooltip("Distance from the road edge to the nearest building face (metres).")]
+        [SerializeField] private float buildingSetback = 8f;
 
         [Tooltip("Minimum gap between adjacent buildings (metres).")]
-        [SerializeField] private float minGap = 3f;
+        [SerializeField] private float minGap = 4f;
 
         [Tooltip("Maximum gap between adjacent buildings (metres).")]
-        [SerializeField] private float maxGap = 8f;
+        [SerializeField] private float maxGap = 12f;
 
-        [Header("Building Size Ranges")]
-        [Tooltip("Minimum / maximum building width along the road (X axis, metres).")]
-        [SerializeField] private Vector2 widthRange = new Vector2(5f, 15f);
+        [Header("Building Dimensions")]
+        [Tooltip("Length of building along the road (metres, min/max).")]
+        [SerializeField] private Vector2 lengthRange = new Vector2(14f, 32f);
 
-        [Tooltip("Minimum / maximum building height (Y axis, metres).")]
-        [SerializeField] private Vector2 heightRange = new Vector2(8f, 30f);
+        [Tooltip("Depth of building away from the road (metres, min/max).")]
+        [SerializeField] private Vector2 depthRange = new Vector2(16f, 30f);
 
-        [Tooltip("Minimum / maximum building depth away from road (Z axis of building, metres).")]
-        [SerializeField] private Vector2 depthRange = new Vector2(5f, 12f);
+        [Tooltip("Height of standard buildings (metres, min/max).")]
+        [SerializeField] private Vector2 standardHeightRange = new Vector2(16f, 42f);
 
-        [Header("Windows")]
-        [Tooltip("Generate simple darker window sub-quads on building faces.")]
-        [SerializeField] private bool generateWindows = true;
+        [Tooltip("Height of landmark skyscrapers (metres, min/max).")]
+        [SerializeField] private Vector2 skyscraperHeightRange = new Vector2(55f, 95f);
 
-        [Tooltip("Approximate window size (metres).")]
-        [SerializeField] private float windowSize = 1.2f;
+        [Tooltip("Probability of spawning a landmark skyscraper (0..1).")]
+        [Range(0f, 0.4f)]
+        [SerializeField] private float skyscraperChance = 0.22f;
 
-        [Tooltip("Spacing between window centres (metres).")]
-        [SerializeField] private float windowSpacing = 2.5f;
+        [Header("Architectural Features")]
+        [Tooltip("Add rooftop HVAC structures and antennas.")]
+        [SerializeField] private bool addRooftopDetails = true;
 
-        // ──────────────────────────── Internals ───────────────────────────────────────
+        [Tooltip("Add ground-floor storefront display bands.")]
+        [SerializeField] private bool addGroundStorefronts = true;
 
-        /// <summary>Container for all generated building GameObjects.</summary>
+        // ──────────────────────────── Internal Material Cache ─────────────────────────
+
         private Transform _buildingContainer;
+        private List<Material> facadeMaterials = new List<Material>();
+        private Material glassTowerMat;
+        private Material storefrontMat;
+        private Material roofTechMat;
+        private bool materialsInit = false;
 
-        // Pre-defined building colour palette
-        private static readonly Color[] BuildingColors = new Color[]
-        {
-            new Color(0.55f, 0.55f, 0.55f), // mid gray
-            new Color(0.70f, 0.70f, 0.70f), // light gray
-            new Color(0.40f, 0.40f, 0.45f), // dark gray-blue
-            new Color(0.55f, 0.60f, 0.75f), // steel blue
-            new Color(0.72f, 0.65f, 0.52f), // tan
-            new Color(0.80f, 0.75f, 0.65f), // beige
-            new Color(0.60f, 0.50f, 0.42f), // brown-tan
-        };
-
-        // ──────────────────────────── Public API ──────────────────────────────────────
+        // ──────────────────────────── Generation API ──────────────────────────────────
 
         /// <summary>
-        /// Generates buildings along both sides of the road.
+        /// Generates urban city blocks along the full boulevard length.
         /// </summary>
-        /// <param name="roadLength">Length of the road in metres.</param>
-        /// <param name="roadWidth">Total width of the road (lanes + shoulders) in metres.</param>
+        /// <param name="roadLength">Total length of the boulevard (e.g. 2500m).</param>
+        /// <param name="roadWidth">Total width including sidewalks (metres).</param>
         public void GenerateBuildings(float roadLength, float roadWidth)
         {
             ClearBuildings();
+            InitMaterials();
 
-            _buildingContainer = new GameObject("Buildings").transform;
+            _buildingContainer = new GameObject("CityBuildings_2.5km").transform;
             _buildingContainer.SetParent(transform, false);
 
-            // Generate buildings on the left side (negative X)
-            GenerateSide(roadLength, roadWidth, isLeftSide: true);
+            // Left side city blocks
+            GenerateBoulevardSide(roadLength, roadWidth, isLeftSide: true);
 
-            // Generate buildings on the right side (positive X)
-            GenerateSide(roadLength, roadWidth, isLeftSide: false);
+            // Right side city blocks
+            GenerateBoulevardSide(roadLength, roadWidth, isLeftSide: false);
 
-            Debug.Log("[BuildingGenerator] Buildings generated on both sides of the road.");
+            Debug.Log($"[BuildingGenerator] Urban cityscape generated along {roadLength}m boulevard.");
         }
 
-        /// <summary>Destroys all previously generated buildings.</summary>
+        /// <summary>Destroys all previously generated city buildings.</summary>
         public void ClearBuildings()
         {
             if (_buildingContainer != null)
@@ -96,140 +97,156 @@ namespace AutoSim.Environment
             }
         }
 
+        // ──────────────────────────── Materials Setup ─────────────────────────────────
+
+        private void InitMaterials()
+        {
+            if (materialsInit && facadeMaterials.Count > 0) return;
+
+            facadeMaterials.Clear();
+
+            // Modern architectural palette
+            Color[] colors = new Color[]
+            {
+                new Color(0.24f, 0.26f, 0.30f), // Anthracite Charcoal
+                new Color(0.82f, 0.84f, 0.86f), // White Concrete / Stucco
+                new Color(0.42f, 0.46f, 0.52f), // Slate Steel
+                new Color(0.76f, 0.70f, 0.60f), // Warm Travertine Stone
+                new Color(0.30f, 0.36f, 0.44f), // Deep Cyan Office
+                new Color(0.58f, 0.34f, 0.26f), // Architectural Terracotta Brick
+                new Color(0.88f, 0.88f, 0.90f), // Platinum Modern Glass
+                new Color(0.65f, 0.68f, 0.72f), // Silver Metallic
+            };
+
+            for (int i = 0; i < colors.Length; i++)
+            {
+                Material m = CreateMaterial($"Facade_{i}", colors[i], 0.25f, 0.1f);
+                facadeMaterials.Add(m);
+            }
+
+            // Glass tower reflective cyan
+            glassTowerMat = CreateMaterial("GlassTowerMat", new Color(0.20f, 0.45f, 0.60f), 0.85f, 0.35f);
+
+            // Warm illuminated ground-floor storefront
+            storefrontMat = CreateMaterial("StorefrontGlow", new Color(0.92f, 0.85f, 0.68f), 0.5f, 0.0f);
+
+            // Roof mechanical equipment
+            roofTechMat = CreateMaterial("RoofTechMat", new Color(0.20f, 0.22f, 0.24f), 0.1f, 0.2f);
+
+            materialsInit = true;
+        }
+
+        private static Material CreateMaterial(string name, Color color, float glossiness, float metallic)
+        {
+            Material mat = new Material(Shader.Find("Standard"))
+            {
+                name = name,
+                color = color
+            };
+            mat.SetFloat("_Glossiness", glossiness);
+            mat.SetFloat("_Metallic", metallic);
+            return mat;
+        }
+
         // ──────────────────────────── Side Generation ─────────────────────────────────
 
-        private void GenerateSide(float roadLength, float roadWidth, bool isLeftSide)
+        private void GenerateBoulevardSide(float roadLength, float roadWidth, bool isLeftSide)
         {
-            string sideName = isLeftSide ? "Left" : "Right";
-            Transform sideParent = new GameObject($"Buildings_{sideName}").transform;
+            string sideName = isLeftSide ? "West" : "East";
+            Transform sideParent = new GameObject($"CityBlock_{sideName}").transform;
             sideParent.SetParent(_buildingContainer, false);
 
-            float cursor = 0f; // Z position cursor
-            int buildingIndex = 0;
+            float cursorZ = 20f; // Start with gentle setback from road start
+            int buildingIdx = 0;
 
-            while (cursor < roadLength)
+            while (cursorZ < roadLength - 40f)
             {
-                // Randomise building dimensions
-                float bWidth = Random.Range(depthRange.x, depthRange.y);  // depth along X (away from road)
-                float bHeight = Random.Range(heightRange.x, heightRange.y);
-                float bLength = Random.Range(widthRange.x, widthRange.y); // length along Z (along road)
+                // Randomise building parameters
+                float bLength = Random.Range(lengthRange.x, lengthRange.y);
+                float bDepth = Random.Range(depthRange.x, depthRange.y);
 
-                // Check if building fits within road length
-                if (cursor + bLength > roadLength) break;
+                if (cursorZ + bLength > roadLength - 20f) break;
 
-                // Calculate X position: setback from road centre, plus half the building depth
-                float xSign = isLeftSide ? -1f : 1f;
-                float xPos = xSign * (roadWidth / 2f + buildingSetback + bWidth / 2f);
-                float zPos = cursor + bLength / 2f;
+                bool isSkyscraper = Random.value < skyscraperChance;
+                float bHeight = isSkyscraper
+                    ? Random.Range(skyscraperHeightRange.x, skyscraperHeightRange.y)
+                    : Random.Range(standardHeightRange.x, standardHeightRange.y);
+
+                // Setback from boulevard centerline
+                float halfRoad = roadWidth / 2f;
+                float xOffset = halfRoad + buildingSetback + (bDepth / 2f);
+                float xPos = isLeftSide ? -xOffset : xOffset;
+                float zPos = cursorZ + (bLength / 2f);
                 float yPos = bHeight / 2f;
 
-                // Create the building
-                GameObject building = CreateBoxBuilding(
-                    $"Building_{sideName}_{buildingIndex}",
-                    new Vector3(xPos, yPos, zPos),
-                    new Vector3(bWidth, bHeight, bLength));
-                building.transform.SetParent(sideParent, false);
+                // Pick facade material
+                Material mat = isSkyscraper ? glassTowerMat : facadeMaterials[Random.Range(0, facadeMaterials.Count)];
 
-                // Generate windows on the road-facing side
-                if (generateWindows)
+                // Main Building Block
+                GameObject buildingObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                buildingObj.name = $"Bld_{sideName}_{buildingIdx}_{(isSkyscraper ? "Tower" : "Block")}";
+                buildingObj.transform.SetParent(sideParent, false);
+                buildingObj.transform.position = new Vector3(xPos, yPos, zPos);
+                buildingObj.transform.localScale = new Vector3(bDepth, bHeight, bLength);
+                buildingObj.GetComponent<MeshRenderer>().sharedMaterial = mat;
+
+                // Ground Floor Storefront Band
+                if (addGroundStorefronts && bHeight > 12f)
                 {
-                    GenerateWindowsOnFace(building.transform, bWidth, bHeight, bLength, isLeftSide);
+                    CreateStorefrontBand(buildingObj.transform, bDepth, bLength, isLeftSide);
                 }
 
-                // Advance cursor by building length + random gap
-                cursor += bLength + Random.Range(minGap, maxGap);
-                buildingIndex++;
+                // Rooftop Architectural Elements
+                if (addRooftopDetails && bHeight > 20f)
+                {
+                    CreateRooftopFeatures(buildingObj.transform, bDepth, bHeight, bLength, isSkyscraper);
+                }
+
+                cursorZ += bLength + Random.Range(minGap, maxGap);
+                buildingIdx++;
             }
         }
 
-        // ──────────────────────────── Building Creation ───────────────────────────────
+        // ──────────────────────────── Architectural Accents ───────────────────────────
 
-        /// <summary>Creates a simple cube-based building with a random colour.</summary>
-        private GameObject CreateBoxBuilding(string name, Vector3 position, Vector3 size)
+        private void CreateStorefrontBand(Transform building, float depth, float length, bool isLeftSide)
         {
-            GameObject building = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            building.name = name;
-            building.transform.position = position;
-            building.transform.localScale = size;
+            float storeH = 3.6f;
+            float storeThick = 0.35f;
+            float localY = (-0.5f) + (storeH / 2f) / building.localScale.y;
+            float localX = isLeftSide ? (0.5f + (storeThick / 2f) / depth) : (-0.5f - (storeThick / 2f) / depth);
 
-            // Assign random building colour
-            Color color = BuildingColors[Random.Range(0, BuildingColors.Length)];
-            Material mat = new Material(Shader.Find("Standard"))
-            {
-                color = color
-            };
-            mat.SetFloat("_Glossiness", 0.1f);
-            mat.SetFloat("_Metallic", 0f);
-            building.GetComponent<MeshRenderer>().material = mat;
-
-            return building;
+            GameObject store = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            store.name = "Storefront";
+            store.transform.SetParent(building, false);
+            store.transform.localPosition = new Vector3(localX, localY, 0f);
+            store.transform.localScale = new Vector3(storeThick / depth, storeH / building.localScale.y, 0.95f);
+            DestroyImmediate(store.GetComponent<Collider>());
+            store.GetComponent<MeshRenderer>().sharedMaterial = storefrontMat;
         }
 
-        // ──────────────────────────── Window Generation ───────────────────────────────
-
-        /// <summary>
-        /// Generates simple darker sub-quads on the road-facing face of the building
-        /// to represent windows.
-        /// </summary>
-        private void GenerateWindowsOnFace(Transform building, float bWidth, float bHeight, float bLength,
-            bool isLeftSide)
+        private void CreateRooftopFeatures(Transform building, float depth, float height, float length, bool isSkyscraper)
         {
-            // Window colour: darker than the building
-            Color buildingColor = building.GetComponent<MeshRenderer>().material.color;
-            Color windowColor = buildingColor * 0.35f;
-            windowColor.a = 1f;
+            // Rooftop HVAC box
+            GameObject hvac = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            hvac.name = "RoofHVAC";
+            hvac.transform.SetParent(building, false);
+            hvac.transform.localPosition = new Vector3(0f, 0.5f + (1.2f / height), 0f);
+            hvac.transform.localScale = new Vector3(0.45f, 2.4f / height, 0.45f);
+            DestroyImmediate(hvac.GetComponent<Collider>());
+            hvac.GetComponent<MeshRenderer>().sharedMaterial = roofTechMat;
 
-            Material windowMat = new Material(Shader.Find("Standard"))
+            // Antenna on skyscrapers
+            if (isSkyscraper)
             {
-                color = windowColor
-            };
-            windowMat.SetFloat("_Glossiness", 0.6f);
-            windowMat.SetFloat("_Metallic", 0f);
-
-            // Windows start 3m above ground, end 1m below roof
-            float windowStartY = 3f;
-            float windowEndY = bHeight - 1f;
-            if (windowEndY <= windowStartY) return; // building too short for windows
-
-            // Calculate number of window rows and columns
-            int rows = Mathf.FloorToInt((windowEndY - windowStartY) / windowSpacing);
-            int cols = Mathf.FloorToInt((bLength - 1f) / windowSpacing);
-            if (rows <= 0 || cols <= 0) return;
-
-            Transform windowContainer = new GameObject("Windows").transform;
-            windowContainer.SetParent(building, false);
-
-            // The road-facing face normal
-            float xOffset = isLeftSide ? (bWidth / 2f + 0.01f) / bWidth : -(bWidth / 2f + 0.01f) / bWidth;
-
-            for (int r = 0; r < rows; r++)
-            {
-                for (int c = 0; c < cols; c++)
-                {
-                    // Position in local space of the building (scale = 1 in local)
-                    float localY = (-0.5f + (windowStartY + r * windowSpacing + windowSpacing / 2f) / bHeight);
-                    float localZ = (-0.5f + (0.5f + c * windowSpacing + windowSpacing / 2f) / bLength);
-
-                    GameObject window = GameObject.CreatePrimitive(PrimitiveType.Quad);
-                    window.name = $"Window_{r}_{c}";
-
-                    // Remove collider from windows — they're purely decorative
-                    Object.Destroy(window.GetComponent<Collider>());
-
-                    window.transform.SetParent(windowContainer, false);
-                    window.transform.localPosition = new Vector3(xOffset, localY, localZ);
-                    window.transform.localScale = new Vector3(
-                        windowSize / bLength,   // scale relative to building
-                        windowSize / bHeight,
-                        1f);
-
-                    // Rotate to face outward from the building
-                    window.transform.localRotation = isLeftSide
-                        ? Quaternion.Euler(0f, -90f, 0f)
-                        : Quaternion.Euler(0f, 90f, 0f);
-
-                    window.GetComponent<MeshRenderer>().material = windowMat;
-                }
+                float antennaH = 9.0f;
+                GameObject antenna = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                antenna.name = "Antenna";
+                antenna.transform.SetParent(building, false);
+                antenna.transform.localPosition = new Vector3(0f, 0.5f + (antennaH / 2f) / height, 0f);
+                antenna.transform.localScale = new Vector3(0.04f, (antennaH / 2f) / height, 0.04f);
+                DestroyImmediate(antenna.GetComponent<Collider>());
+                antenna.GetComponent<MeshRenderer>().sharedMaterial = roofTechMat;
             }
         }
     }
