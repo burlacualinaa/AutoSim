@@ -221,8 +221,8 @@ namespace AutoSim.Vehicle
             if (GetComponent<VehicleForceFeedback>() == null)
                 gameObject.AddComponent<VehicleForceFeedback>();
 
-            // Ensure realistic 3D interior cockpit is present
-            if (GetComponent<CockpitSetup>() == null)
+            // Ensure realistic 3D interior cockpit is present only if no dedicated car model is attached
+            if (GetComponent<PolyDriveCarSetup>() == null && GetComponent<CockpitSetup>() == null)
             {
                 gameObject.AddComponent<CockpitSetup>();
             }

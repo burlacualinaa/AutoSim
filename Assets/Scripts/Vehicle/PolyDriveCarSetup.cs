@@ -7,6 +7,7 @@ using AutoSim.Input;
 using AutoSim.UI;
 using AutoSim.XR;
 using AutoSim.Networking;
+using AutoSim.Environment;
 
 namespace AutoSim.Vehicle
 {
@@ -33,7 +34,7 @@ namespace AutoSim.Vehicle
 
         [Header("Driver View & Steering")]
         [Tooltip("Driver eye anchor position relative to this car (X=left/right, Y=height, Z=forward/back).")]
-        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.12f, 0.05f);
+        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.25f, 0.20f);
 
         [Tooltip("Maximum steering wheel rotation degrees lock-to-lock.")]
         [SerializeField] private float maxSteerDegrees = 450f;
@@ -110,6 +111,22 @@ namespace AutoSim.Vehicle
             if (ffb == null) ffb = gameObject.AddComponent<VehicleForceFeedback>();
 
             vehicleController.Transmission = transmission;
+
+            // 6c. Clean up any redundant procedural CockpitSetup or VirtualCockpit objects
+            var proceduralCockpit = GetComponent<CockpitSetup>();
+            if (proceduralCockpit != null)
+            {
+                proceduralCockpit.ClearCockpit();
+                if (Application.isPlaying) Destroy(proceduralCockpit);
+                else DestroyImmediate(proceduralCockpit);
+            }
+
+            GameObject oldVirtualCockpit = GameObject.Find("VirtualCockpit");
+            if (oldVirtualCockpit != null)
+            {
+                if (Application.isPlaying) Destroy(oldVirtualCockpit);
+                else DestroyImmediate(oldVirtualCockpit);
+            }
 
             // 7. Input Providers
             KeyboardInputProvider keyboard = GetComponent<KeyboardInputProvider>();
@@ -241,12 +258,13 @@ namespace AutoSim.Vehicle
                 GameObject anchorObj = new GameObject("DriverSeatAnchor");
                 anchorObj.transform.SetParent(transform, false);
                 anchorObj.transform.localPosition = driverSeatOffset;
-                anchorObj.transform.localRotation = Quaternion.identity;
+                anchorObj.transform.localRotation = Quaternion.Euler(3.5f, 0f, 0f);
                 anchor = anchorObj.transform;
             }
             else
             {
                 anchor.localPosition = driverSeatOffset;
+                anchor.localRotation = Quaternion.Euler(3.5f, 0f, 0f);
             }
         }
 

@@ -26,6 +26,15 @@ namespace AutoSim.Vehicle
         [Range(0f, 1f)]
         [SerializeField] private float impactIntensity = 0.8f;
 
+        [Header("Centering Spring Force")]
+        [Tooltip("Centering spring saturation (0..100%). Lower = softer resistance.")]
+        [Range(0, 100)]
+        [SerializeField] private int centeringSpringSaturation = 18;
+
+        [Tooltip("Centering spring stiffness coefficient (0..100%). Lower = lighter, smoother wheel.")]
+        [Range(0, 100)]
+        [SerializeField] private int centeringSpringCoefficient = 14;
+
         [Header("Suspension Shock Detection")]
         [Tooltip("Minimum suspension compression velocity (units/sec) required to trigger bump haptics.")]
         [SerializeField] private float suspensionBumpThreshold = 3.5f;
@@ -70,10 +79,10 @@ namespace AutoSim.Vehicle
         {
             DiscoverWheels();
 
-            // Apply subtle centering spring to maintain authentic wheel weight on PC
+            // Apply comfortable, lighter centering spring on PC
             if (enableFFB)
             {
-                LogitechFFBNative.PlayCenteringSpring(0, 0, 40, 30);
+                LogitechFFBNative.PlayCenteringSpring(0, 0, centeringSpringSaturation, centeringSpringCoefficient);
             }
         }
 

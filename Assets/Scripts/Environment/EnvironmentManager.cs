@@ -74,11 +74,15 @@ namespace AutoSim.Environment
                 Debug.LogWarning("[EnvironmentManager] BuildingGenerator or road data missing. Skipping buildings.");
             }
 
-            // Step 3: Cockpit
-            if (cockpitSetup != null)
+            // Step 3: Cockpit (skip if dedicated PolyDrive vehicle is present)
+            if (cockpitSetup != null && FindObjectOfType<AutoSim.Vehicle.PolyDriveCarSetup>() == null)
             {
                 Debug.Log("[EnvironmentManager] Step 3/3 — Generating cockpit…");
                 cockpitSetup.GenerateCockpit();
+            }
+            else if (cockpitSetup != null)
+            {
+                cockpitSetup.ClearCockpit();
             }
             else
             {

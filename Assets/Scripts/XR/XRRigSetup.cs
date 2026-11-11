@@ -14,7 +14,7 @@ namespace AutoSim.XR
     {
         [Header("Driver Seat Anchor")]
         [Tooltip("Offset of the driver's eyes relative to the vehicle (X=left/right, Y=height, Z=front/back).")]
-        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.12f, 0.05f);
+        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.25f, 0.20f);
 
         [Header("AR Pass-through Settings")]
         [Tooltip("Make camera background solid black (0,0,0,0) for HoloLens 2 transparent display.")]
