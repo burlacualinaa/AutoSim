@@ -130,6 +130,15 @@ namespace AutoSim.Input
         /// <summary>Active button bitmask (paddles, face buttons).</summary>
         public uint Buttons { get; private set; }
 
+        /// <summary>Active gear detected from Logitech Driving Force H-Shifter (-1=Reverse, 0=Neutral, 1..6=Gears 1-6).</summary>
+        public int ShifterPosition { get; private set; }
+
+        /// <summary>Whether Left Paddle (Gear Down / LB) is currently pressed.</summary>
+        public bool PaddleLeftPressed { get; private set; }
+
+        /// <summary>Whether Right Paddle (Gear Up / RB) is currently pressed.</summary>
+        public bool PaddleRightPressed { get; private set; }
+
         /// <summary>True if a physical wheel or fallback provider is actively feeding input.</summary>
         public bool IsConnected => IsWheelConnected || (autoFallbackToKeyboard && keyboardFallback != null && keyboardFallback.IsConnected);
 
@@ -780,9 +789,14 @@ namespace AutoSim.Input
         private void ReadButtons()
         {
             uint mask = 0;
+            PaddleLeftPressed = false;
+            PaddleRightPressed = false;
+            int detectedShifter = 0;
+
             if (activeWheelDevice == null)
             {
                 Buttons = 0;
+                ShifterPosition = 0;
                 return;
             }
 
@@ -792,18 +806,41 @@ namespace AutoSim.Input
                 if (control is ButtonControl btn && btn.isPressed)
                 {
                     string n = btn.name.ToLowerInvariant();
-                    if (n.Contains("buttonsouth") || n == "a" || n == "0") mask |= AutoSimConstants.BTN_A;
-                    else if (n.Contains("buttoneast") || n == "b" || n == "1") mask |= AutoSimConstants.BTN_B;
-                    else if (n.Contains("buttonwest") || n == "x" || n == "2") mask |= AutoSimConstants.BTN_X;
-                    else if (n.Contains("buttonnorth") || n == "y" || n == "3") mask |= AutoSimConstants.BTN_Y;
-                    else if (n.Contains("leftshoulder") || n.Contains("paddleleft") || n == "4") mask |= AutoSimConstants.BTN_PADDLE_LEFT;
-                    else if (n.Contains("rightshoulder") || n.Contains("paddleright") || n == "5") mask |= AutoSimConstants.BTN_PADDLE_RIGHT;
-                    else if (n.Contains("menu") || n.Contains("start") || n == "7") mask |= AutoSimConstants.BTN_MENU;
+                    // Face buttons
+                    if (n.Contains("buttonsouth") || n == "a" || n == "0" || n == "trigger") mask |= AutoSimConstants.BTN_A;
+                    else if (n.Contains("buttoneast") || n == "b" || n == "1" || n == "button2") mask |= AutoSimConstants.BTN_B;
+                    else if (n.Contains("buttonwest") || n == "x" || n == "2" || n == "button3") mask |= AutoSimConstants.BTN_X;
+                    else if (n.Contains("buttonnorth") || n == "y" || n == "3" || n == "button4") mask |= AutoSimConstants.BTN_Y;
+
+                    // Paddles: Right Paddle (Gear Up), Left Paddle (Gear Down)
+                    else if (n.Contains("rightshoulder") || n.Contains("paddleright") || n == "5" || n == "button5")
+                    {
+                        mask |= AutoSimConstants.BTN_PADDLE_RIGHT;
+                        PaddleRightPressed = true;
+                    }
+                    else if (n.Contains("leftshoulder") || n.Contains("paddleleft") || n == "6" || n == "button6" || n == "4")
+                    {
+                        mask |= AutoSimConstants.BTN_PADDLE_LEFT;
+                        PaddleLeftPressed = true;
+                    }
+
+                    else if (n.Contains("menu") || n.Contains("start") || n == "7" || n == "button8") mask |= AutoSimConstants.BTN_MENU;
+
+                    // Logitech Driving Force H-Shifter positions (Buttons 11 through 18)
+                    else if (n == "button11" || n == "11" || n == "button10" || n == "10") { mask |= AutoSimConstants.BTN_GEAR_1; detectedShifter = 1; }
+                    else if (n == "button12" || n == "12") { mask |= AutoSimConstants.BTN_GEAR_2; detectedShifter = 2; }
+                    else if (n == "button13" || n == "13") { mask |= AutoSimConstants.BTN_GEAR_3; detectedShifter = 3; }
+                    else if (n == "button14" || n == "14") { mask |= AutoSimConstants.BTN_GEAR_4; detectedShifter = 4; }
+                    else if (n == "button15" || n == "15") { mask |= AutoSimConstants.BTN_GEAR_5; detectedShifter = 5; }
+                    else if (n == "button16" || n == "16") { mask |= AutoSimConstants.BTN_GEAR_6; detectedShifter = 6; }
+                    else if (n == "button17" || n == "17" || n == "button18" || n == "18") { mask |= AutoSimConstants.BTN_GEAR_R; detectedShifter = -1; }
+
                     else mask |= 1u; // generic press
                 }
             }
 
             Buttons = mask;
+            ShifterPosition = detectedShifter;
         }
 
         // ──────────────────────────── Calibration Helpers ───────────────────────────

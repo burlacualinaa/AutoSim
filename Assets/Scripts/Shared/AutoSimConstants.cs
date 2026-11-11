@@ -16,7 +16,7 @@ namespace AutoSim
         public const float MAX_SPEED_KMH = 180f;
 
         // Telemetry
-        public const float TELEMETRY_RECORD_HZ = 60f;
+        public const float TELEMETRY_RECORD_HZ = 20f;       // Fixed at 20 Hz per research protocol
         public const float TELEMETRY_FLUSH_INTERVAL = 5f;   // seconds
 
         // G920 Button Bitmask
@@ -30,6 +30,16 @@ namespace AutoSim
         public const uint BTN_MENU = 1 << 7;
         public const uint BTN_PADDLE_LEFT = 1 << 8;
         public const uint BTN_PADDLE_RIGHT = 1 << 9;
+        public const uint BTN_GEAR_1 = 1 << 10;
+        public const uint BTN_GEAR_2 = 1 << 11;
+        public const uint BTN_GEAR_3 = 1 << 12;
+        public const uint BTN_GEAR_4 = 1 << 13;
+        public const uint BTN_GEAR_5 = 1 << 14;
+        public const uint BTN_GEAR_6 = 1 << 15;
+        public const uint BTN_GEAR_R = 1 << 16;
+
+        // Transmission
+        public const float CLUTCH_ENGAGE_THRESHOLD = 0.80f; // 80% depression required for manual shift
 
         // Scenario
         public const float HAZARD_TRIGGER_DISTANCE = 80f;   // metres

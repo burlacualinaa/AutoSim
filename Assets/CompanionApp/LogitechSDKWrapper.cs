@@ -77,6 +77,38 @@ namespace AutoSim.CompanionApp
         [return: MarshalAs(UnmanagedType.U1)]
         public static extern bool LogiStopDamperForce(int index);
 
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiPlayBumpyRoadEffect(int index, int magnitudePercentage);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiStopBumpyRoadEffect(int index);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiPlayFrontalCollisionForce(int index, int magnitudePercentage);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiPlaySideCollisionForce(int index, int magnitudePercentage);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiPlaySurfaceEffect(int index, int type, int magnitudePercentage, int period);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiStopSurfaceEffect(int index);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiHasForceFeedback(int index);
+
+        [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+        [return: MarshalAs(UnmanagedType.U1)]
+        public static extern bool LogiIsPlaying(int index, int forceType);
+
         // ═════════════════════════════════════════════════════════════
         // DIJOYSTATE2 — DirectInput joystick state (280 bytes)
         // ═════════════════════════════════════════════════════════════
@@ -193,6 +225,89 @@ namespace AutoSim.CompanionApp
                     mask |= (1u << i);
             }
             return mask;
+        }
+
+        // ═════════════════════════════════════════════════════════════
+        // Safe Force Feedback Execution (with DllNotFoundException guards)
+        // ═════════════════════════════════════════════════════════════
+
+        private static bool? _isNativeDllAvailable = null;
+
+        /// <summary>Checks whether LogitechSteeringWheelEnginesWrapper.dll is present and accessible.</summary>
+        public static bool IsNativeDllAvailable
+        {
+            get
+            {
+                if (_isNativeDllAvailable.HasValue)
+                    return _isNativeDllAvailable.Value;
+
+                try
+                {
+                    _isNativeDllAvailable = LogiIsConnected(0);
+                    return _isNativeDllAvailable.Value;
+                }
+                catch (DllNotFoundException)
+                {
+                    _isNativeDllAvailable = false;
+                    return false;
+                }
+                catch (Exception)
+                {
+                    _isNativeDllAvailable = false;
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>Plays a short impact/shock haptic impulse (0-100%).</summary>
+        public static bool PlayImpactForceSafe(int index, int magnitudePercentage)
+        {
+            if (!IsNativeDllAvailable) return false;
+            try
+            {
+                magnitudePercentage = Math.Max(0, Math.Min(100, magnitudePercentage));
+                return LogiPlayFrontalCollisionForce(index, magnitudePercentage);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Plays a bumpy road / curb effect (0-100%).</summary>
+        public static bool PlayBumpyRoadSafe(int index, int magnitudePercentage)
+        {
+            if (!IsNativeDllAvailable) return false;
+            try
+            {
+                magnitudePercentage = Math.Max(0, Math.Min(100, magnitudePercentage));
+                return LogiPlayBumpyRoadEffect(index, magnitudePercentage);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Stops bumpy road effect.</summary>
+        public static bool StopBumpyRoadSafe(int index)
+        {
+            if (!IsNativeDllAvailable) return false;
+            try { return LogiStopBumpyRoadEffect(index); } catch { return false; }
+        }
+
+        /// <summary>Plays a spring centering force on the steering wheel.</summary>
+        public static bool PlayCenteringSpringSafe(int index, int offset, int saturation, int coefficient)
+        {
+            if (!IsNativeDllAvailable) return false;
+            try { return LogiPlaySpringForce(index, offset, saturation, coefficient); } catch { return false; }
+        }
+
+        /// <summary>Stops all active forces on the specified wheel index.</summary>
+        public static void StopAllForcesSafe(int index)
+        {
+            if (!IsNativeDllAvailable) return;
+            try
+            {
+                LogiStopBumpyRoadEffect(index);
+                LogiStopConstantForce(index);
+                LogiStopDamperForce(index);
+            }
+            catch { }
         }
 
         // ── Tiny math helpers (avoid pulling in Mathf on non-Unity builds) ──

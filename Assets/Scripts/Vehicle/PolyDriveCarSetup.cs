@@ -102,6 +102,15 @@ namespace AutoSim.Vehicle
 
             vehicleController.SetWheelColliders(colFL, colFR, colRL, colRR);
 
+            // 6b. Setup Transmission & Force Feedback
+            TransmissionController transmission = GetComponent<TransmissionController>();
+            if (transmission == null) transmission = gameObject.AddComponent<TransmissionController>();
+
+            VehicleForceFeedback ffb = GetComponent<VehicleForceFeedback>();
+            if (ffb == null) ffb = gameObject.AddComponent<VehicleForceFeedback>();
+
+            vehicleController.Transmission = transmission;
+
             // 7. Input Providers
             KeyboardInputProvider keyboard = GetComponent<KeyboardInputProvider>();
             if (keyboard == null) keyboard = gameObject.AddComponent<KeyboardInputProvider>();

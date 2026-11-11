@@ -54,6 +54,17 @@ namespace AutoSim.Vehicle
         [Tooltip("Explicit input provider. If unassigned, automatically looks for LogitechG920InputProvider first, then any IInputProvider.")]
         [SerializeField] private MonoBehaviour inputProviderSource;
 
+        [Header("Transmission & Feedback")]
+        [Tooltip("Dual-mode transmission controller (Automatic R-N-D / Manual H-Shifter).")]
+        [SerializeField] private TransmissionController transmissionController;
+
+        /// <summary>Access to the attached TransmissionController.</summary>
+        public TransmissionController Transmission
+        {
+            get => transmissionController;
+            set => transmissionController = value;
+        }
+
         /// <summary>Allows procedural assignment of the input provider source.</summary>
         public MonoBehaviour InputProviderSource
         {
@@ -201,6 +212,15 @@ namespace AutoSim.Vehicle
                 Debug.Log($"[VehicleController] Active Input Provider bound to: {(ActiveInputProvider != null ? ActiveInputProvider.ProviderName : "NULL")}");
             }
 
+            // Ensure transmission and force feedback systems are attached
+            if (transmissionController == null)
+                transmissionController = GetComponent<TransmissionController>();
+            if (transmissionController == null)
+                transmissionController = gameObject.AddComponent<TransmissionController>();
+
+            if (GetComponent<VehicleForceFeedback>() == null)
+                gameObject.AddComponent<VehicleForceFeedback>();
+
             // Ensure realistic 3D interior cockpit is present
             if (GetComponent<CockpitSetup>() == null)
             {
@@ -273,12 +293,30 @@ namespace AutoSim.Vehicle
         }
 
         // ---------------------------------------------------------------
-        //  Motor Torque (Rear-Wheel Drive) with Traction Control
+        //  Motor Torque (Rear-Wheel Drive) with Directional Transmission
         // ---------------------------------------------------------------
 
         private void ApplyMotorTorque(float throttle)
         {
-            float baseTorque = AutoSimConstants.MAX_MOTOR_TORQUE * throttle;
+            int currentGear = transmissionController != null ? transmissionController.CurrentGear : 1;
+            float ratio = transmissionController != null ? transmissionController.GearRatioMultiplier : 1.0f;
+
+            float baseTorque = 0f;
+            if (currentGear == 0)
+            {
+                // Neutral: engine produces zero drive torque to wheels
+                baseTorque = 0f;
+            }
+            else if (currentGear > 0)
+            {
+                // Forward gears (1..6)
+                baseTorque = AutoSimConstants.MAX_MOTOR_TORQUE * throttle * ratio;
+            }
+            else if (currentGear == -1)
+            {
+                // Reverse gear: throttle applies negative torque to reverse
+                baseTorque = -AutoSimConstants.MAX_MOTOR_TORQUE * throttle * ratio;
+            }
 
             // Traction control: reduce torque when wheel slip is excessive
             float tcFactorRL = GetTractionControlFactor(rearLeft);
@@ -316,7 +354,7 @@ namespace AutoSim.Vehicle
         }
 
         // ---------------------------------------------------------------
-        //  Brakes
+        //  Brakes (Pure Friction Deceleration — Absolutely NO Auto-Reverse)
         // ---------------------------------------------------------------
 
         private void ApplyBrakes(float brakeInput)
@@ -326,6 +364,13 @@ namespace AutoSim.Vehicle
             for (int i = 0; i < allWheels.Length; i++)
             {
                 allWheels[i].brakeTorque = brakeTorque;
+            }
+
+            // Auto-hold at zero speed when brake is firmly held
+            if (brakeInput > 0.15f && SpeedKmh < 0.3f)
+            {
+                vehicleRigidbody.velocity = Vector3.MoveTowards(vehicleRigidbody.velocity, Vector3.zero, Time.fixedDeltaTime * 4f);
+                vehicleRigidbody.angularVelocity = Vector3.zero;
             }
         }
 
@@ -392,10 +437,13 @@ namespace AutoSim.Vehicle
         {
             float avgWheelRpm = (Mathf.Abs(rearLeft.rpm) + Mathf.Abs(rearRight.rpm)) * 0.5f;
 
-            // Simple approximation: engine RPM = wheel RPM * final drive * gear ratio
-            // Using a fixed combined ratio of ~4.0 for a mid-range estimate
-            const float combinedGearRatio = 4.0f;
-            Rpm = Mathf.Clamp(avgWheelRpm * combinedGearRatio, 800f, 8000f);
+            float gearRatio = (transmissionController != null && transmissionController.CurrentGear != 0)
+                ? Mathf.Max(0.6f, transmissionController.GearRatioMultiplier)
+                : 1.0f;
+
+            // Engine RPM = wheel RPM * final drive * gear ratio + idle floor
+            float calculatedRpm = avgWheelRpm * gearRatio * 3.8f;
+            Rpm = Mathf.Clamp(calculatedRpm + 800f, 800f, 8000f);
         }
 
         // ---------------------------------------------------------------
