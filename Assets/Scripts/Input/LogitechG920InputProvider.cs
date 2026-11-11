@@ -217,6 +217,8 @@ namespace AutoSim.Input
 
         // Auto-calibration state
         private bool isCalibrating = false;
+        private bool initialPedalSampled = false;
+        private float initSampleTimer = 0f;
         private float calibMinThrottle = float.MaxValue;
         private float calibMaxThrottle = float.MinValue;
         private float calibMinBrake = float.MaxValue;
@@ -732,6 +734,28 @@ namespace AutoSim.Input
                 calibMinClutch = Mathf.Min(calibMinClutch, RawClutch);
                 calibMaxClutch = Mathf.Max(calibMaxClutch, RawClutch);
             }
+            else if (!initialPedalSampled && activeWheelDevice != null)
+            {
+                // Auto-detect pedal baseline on startup if untouched
+                initSampleTimer += Time.deltaTime;
+                if (initSampleTimer > 0.35f)
+                {
+                    if (RawThrottle > 0.3f) { throttleRestValue = 1f; throttlePressedValue = -1f; }
+                    else if (RawThrottle < -0.3f) { throttleRestValue = -1f; throttlePressedValue = 1f; }
+                    else { throttleRestValue = 0f; throttlePressedValue = 1f; }
+
+                    if (RawBrake > 0.3f) { brakeRestValue = 1f; brakePressedValue = -1f; }
+                    else if (RawBrake < -0.3f) { brakeRestValue = -1f; brakePressedValue = 1f; }
+                    else { brakeRestValue = 0f; brakePressedValue = 1f; }
+
+                    if (RawClutch > 0.3f) { clutchRestValue = 1f; clutchPressedValue = -1f; }
+                    else if (RawClutch < -0.3f) { clutchRestValue = -1f; clutchPressedValue = 1f; }
+                    else { clutchRestValue = 0f; clutchPressedValue = 1f; }
+
+                    initialPedalSampled = true;
+                    Debug.Log($"[LogitechG920InputProvider] Auto-baselined pedals: Gas[{throttleRestValue:F1}..{throttlePressedValue:F1}], Brake[{brakeRestValue:F1}..{brakePressedValue:F1}], Clutch[{clutchRestValue:F1}..{clutchPressedValue:F1}]");
+                }
+            }
 
             // 3. Process Steering (-1..+1)
             float steer = RawSteering;
@@ -826,14 +850,21 @@ namespace AutoSim.Input
 
                     else if (n.Contains("menu") || n.Contains("start") || n == "7" || n == "button8") mask |= AutoSimConstants.BTN_MENU;
 
-                    // Logitech Driving Force H-Shifter positions (Buttons 11 through 18)
-                    else if (n == "button11" || n == "11" || n == "button10" || n == "10") { mask |= AutoSimConstants.BTN_GEAR_1; detectedShifter = 1; }
-                    else if (n == "button12" || n == "12") { mask |= AutoSimConstants.BTN_GEAR_2; detectedShifter = 2; }
-                    else if (n == "button13" || n == "13") { mask |= AutoSimConstants.BTN_GEAR_3; detectedShifter = 3; }
-                    else if (n == "button14" || n == "14") { mask |= AutoSimConstants.BTN_GEAR_4; detectedShifter = 4; }
-                    else if (n == "button15" || n == "15") { mask |= AutoSimConstants.BTN_GEAR_5; detectedShifter = 5; }
-                    else if (n == "button16" || n == "16") { mask |= AutoSimConstants.BTN_GEAR_6; detectedShifter = 6; }
-                    else if (n == "button17" || n == "17" || n == "button18" || n == "18") { mask |= AutoSimConstants.BTN_GEAR_R; detectedShifter = -1; }
+                    // Logitech Driving Force H-Shifter positions (Logitech G920 hardware layout)
+                    // Retur / Reverse: Button 12 (DirectInput standard) or Button 19
+                    else if (n == "button12" || n == "12" || n == "button19" || n == "19") { mask |= AutoSimConstants.BTN_GEAR_R; detectedShifter = -1; }
+                    // Treapta 1: Button 13 (or Button 11 on some firmware)
+                    else if (n == "button13" || n == "13" || n == "button11" || n == "11") { mask |= AutoSimConstants.BTN_GEAR_1; detectedShifter = 1; }
+                    // Treapta 2: Button 14
+                    else if (n == "button14" || n == "14") { mask |= AutoSimConstants.BTN_GEAR_2; detectedShifter = 2; }
+                    // Treapta 3: Button 15
+                    else if (n == "button15" || n == "15") { mask |= AutoSimConstants.BTN_GEAR_3; detectedShifter = 3; }
+                    // Treapta 4: Button 16
+                    else if (n == "button16" || n == "16") { mask |= AutoSimConstants.BTN_GEAR_4; detectedShifter = 4; }
+                    // Treapta 5: Button 17
+                    else if (n == "button17" || n == "17") { mask |= AutoSimConstants.BTN_GEAR_5; detectedShifter = 5; }
+                    // Treapta 6: Button 18
+                    else if (n == "button18" || n == "18") { mask |= AutoSimConstants.BTN_GEAR_6; detectedShifter = 6; }
 
                     else mask |= 1u; // generic press
                 }

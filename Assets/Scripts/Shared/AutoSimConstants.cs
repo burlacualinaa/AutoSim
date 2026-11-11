@@ -10,8 +10,8 @@ namespace AutoSim
 
         // Vehicle
         public const float MAX_STEERING_ANGLE = 35f;       // degrees at wheels
-        public const float MAX_MOTOR_TORQUE = 400f;         // Nm
-        public const float MAX_BRAKE_TORQUE = 3000f;         // Nm
+        public const float MAX_MOTOR_TORQUE = 1500f;        // Nm (provides realistic progressive automotive torque)
+        public const float MAX_BRAKE_TORQUE = 3000f;        // Nm
         public const float VEHICLE_MASS = 1500f;             // kg
         public const float MAX_SPEED_KMH = 180f;
 

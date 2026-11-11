@@ -91,14 +91,14 @@ namespace AutoSim.Vehicle
             {
                 switch (currentGear)
                 {
-                    case -1: return 3.2f;  // Reverse
+                    case -1: return 3.5f;  // Reverse
                     case 0:  return 0.0f;  // Neutral
-                    case 1:  return 3.6f;  // 1st
-                    case 2:  return 2.3f;  // 2nd
-                    case 3:  return 1.6f;  // 3rd
-                    case 4:  return 1.2f;  // 4th
-                    case 5:  return 0.95f; // 5th
-                    case 6:  return 0.80f; // 6th
+                    case 1:  return 4.0f;  // 1st: strong, progressive launch torque
+                    case 2:  return 2.6f;  // 2nd: progressive power band
+                    case 3:  return 1.8f;  // 3rd: responsive mid-range
+                    case 4:  return 1.3f;  // 4th
+                    case 5:  return 1.0f;  // 5th
+                    case 6:  return 0.8f;  // 6th
                     default: return 1.0f;
                 }
             }
