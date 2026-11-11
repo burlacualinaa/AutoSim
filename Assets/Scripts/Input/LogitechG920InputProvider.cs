@@ -53,7 +53,7 @@ namespace AutoSim.Input
         [SerializeField] private bool invertSteering = false;
 
         [Tooltip("Steering deadzone around center (-1..+1). Values within this range are treated as zero.")]
-        [SerializeField, Range(0f, 0.2f)] private float steeringDeadzone = 0.02f;
+        [SerializeField, Range(0f, 0.2f)] private float steeringDeadzone = 0.0f;
 
         [Tooltip("Steering sensitivity curve exponent (1 = linear, >1 = finer control near center).")]
         [SerializeField, Range(0.5f, 3f)] private float steeringLinearity = 1.0f;
@@ -482,8 +482,17 @@ namespace AutoSim.Input
 
             if (candidates.Count > 0)
             {
-                // Select the latest candidate by default (e.g. Device #3 over stale Device #2)
-                SelectCandidate(candidates.Count - 1);
+                // Prefer native Joystick / HID DirectInput device over generic XInput Gamepad emulator
+                int bestCandidateIndex = 0;
+                for (int c = candidates.Count - 1; c >= 0; c--)
+                {
+                    if (candidates[c].Device is Joystick || !(candidates[c].Device is Gamepad))
+                    {
+                        bestCandidateIndex = c;
+                        break;
+                    }
+                }
+                SelectCandidate(bestCandidateIndex);
                 return;
             }
 
@@ -698,19 +707,19 @@ namespace AutoSim.Input
                     }
                 }
 
-                bool moved = Mathf.Abs(s - cand.LastSteer) > 0.005f ||
-                             Mathf.Abs(t - cand.LastThrottle) > 0.005f ||
-                             Mathf.Abs(b - cand.LastBrake) > 0.005f ||
-                             Mathf.Abs(c - cand.LastClutch) > 0.005f;
-
-                bool hasOffset = Mathf.Abs(s) > 0.02f || Mathf.Abs(t) > 0.05f || Mathf.Abs(b) > 0.05f || Mathf.Abs(c) > 0.05f;
+                bool moved = Mathf.Abs(s - cand.LastSteer) > 0.08f ||
+                             Mathf.Abs(t - cand.LastThrottle) > 0.08f ||
+                             Mathf.Abs(b - cand.LastBrake) > 0.08f ||
+                             Mathf.Abs(c - cand.LastClutch) > 0.08f;
 
                 cand.LastSteer = s;
                 cand.LastThrottle = t;
                 cand.LastBrake = b;
                 cand.LastClutch = c;
 
-                if ((moved || buttonDown || hasOffset) && i != activeCandidateIndex)
+                // Only switch candidate if the user actively moves an axis or presses a button on a DIFFERENT physical device
+                // Never use static offset (pedals rest at 1.0 or -1.0, which caused per-frame device thrashing)
+                if ((moved || buttonDown) && i != activeCandidateIndex)
                 {
                     Debug.Log($"[LogitechG920InputProvider] >>> Dynamic switch to active candidate #{i} ({cand.Device.name}) <<<");
                     SelectCandidate(i);

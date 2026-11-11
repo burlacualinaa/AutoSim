@@ -27,13 +27,16 @@ namespace AutoSim.Vehicle
         [SerializeField] private float impactIntensity = 0.8f;
 
         [Header("Centering Spring Force")]
+        [Tooltip("Enable active centering spring force. When disabled, spring resistance is completely shut off (feather-light rotation).")]
+        [SerializeField] private bool enableCenteringSpring = false;
+
         [Tooltip("Centering spring saturation (0..100%). Lower = softer resistance.")]
         [Range(0, 100)]
-        [SerializeField] private int centeringSpringSaturation = 18;
+        [SerializeField] private int centeringSpringSaturation = 8;
 
         [Tooltip("Centering spring stiffness coefficient (0..100%). Lower = lighter, smoother wheel.")]
         [Range(0, 100)]
-        [SerializeField] private int centeringSpringCoefficient = 14;
+        [SerializeField] private int centeringSpringCoefficient = 6;
 
         [Header("Suspension Shock Detection")]
         [Tooltip("Minimum suspension compression velocity (units/sec) required to trigger bump haptics.")]
@@ -79,10 +82,23 @@ namespace AutoSim.Vehicle
         {
             DiscoverWheels();
 
-            // Apply comfortable, lighter centering spring on PC
+            // Initialize Logitech Wheel SDK on PC
             if (enableFFB)
             {
-                LogitechFFBNative.PlayCenteringSpring(0, 0, centeringSpringSaturation, centeringSpringCoefficient);
+                LogitechFFBNative.InitializeSDK();
+
+                // Lock hardware wheel operating range to 900 degrees
+                LogitechFFBNative.SetOperatingRange(0, 900);
+
+                if (enableCenteringSpring)
+                {
+                    LogitechFFBNative.PlayCenteringSpring(0, 0, centeringSpringSaturation, centeringSpringCoefficient);
+                }
+                else
+                {
+                    // Completely disable centering spring for feather-light, effortless steering
+                    LogitechFFBNative.StopCenteringSpring(0);
+                }
             }
         }
 
@@ -91,10 +107,25 @@ namespace AutoSim.Vehicle
             LogitechFFBNative.StopAllForces(0);
         }
 
+        private void OnDestroy()
+        {
+            LogitechFFBNative.StopAllForces(0);
+            LogitechFFBNative.ShutdownSDK();
+        }
+
+        private void OnApplicationQuit()
+        {
+            LogitechFFBNative.StopAllForces(0);
+            LogitechFFBNative.ShutdownSDK();
+        }
+
         private void FixedUpdate()
         {
             float dt = Time.fixedDeltaTime;
             if (dt <= 0f) return;
+
+            // Pump native Logitech FFB event loop
+            LogitechFFBNative.UpdateSDK();
 
             // Update timers
             if (cooldownTimer > 0f)
@@ -246,7 +277,21 @@ namespace AutoSim.Vehicle
 #if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
             [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiSteeringInitialize(bool ignoreXInputControllers);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            private static extern void LogiUpdate();
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            private static extern void LogiSteeringShutdown();
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
             private static extern bool LogiIsConnected(int index);
+
+            [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
+            [return: MarshalAs(UnmanagedType.U1)]
+            private static extern bool LogiSetOperatingRange(int index, int range);
 
             [DllImport(DLL, CallingConvention = CallingConvention.Cdecl)]
             [return: MarshalAs(UnmanagedType.U1)]
@@ -272,6 +317,7 @@ namespace AutoSim.Vehicle
             [return: MarshalAs(UnmanagedType.U1)]
             private static extern bool LogiStopConstantForce(int index);
 
+            private static bool _isInitialized = false;
             private static bool? _isDllPresent = null;
 
             public static bool IsDllAvailable
@@ -281,8 +327,9 @@ namespace AutoSim.Vehicle
                     if (_isDllPresent.HasValue) return _isDllPresent.Value;
                     try
                     {
+                        // Check if native DLL can be called
                         _isDllPresent = LogiIsConnected(0);
-                        return _isDllPresent.Value;
+                        return true;
                     }
                     catch
                     {
@@ -290,6 +337,51 @@ namespace AutoSim.Vehicle
                         return false;
                     }
                 }
+            }
+
+            public static bool InitializeSDK()
+            {
+                try
+                {
+                    if (!_isInitialized)
+                    {
+                        _isInitialized = LogiSteeringInitialize(false);
+                        _isDllPresent = _isInitialized;
+                        Debug.Log($"[VehicleForceFeedback] Logitech Steering SDK Initialized: {_isInitialized}");
+                    }
+                    return _isInitialized;
+                }
+                catch (Exception ex)
+                {
+                    _isDllPresent = false;
+                    Debug.LogWarning($"[VehicleForceFeedback] Logitech SDK Init warning: {ex.Message}");
+                    return false;
+                }
+            }
+
+            public static void UpdateSDK()
+            {
+                if (!_isInitialized) return;
+                try { LogiUpdate(); }
+                catch { }
+            }
+
+            public static void ShutdownSDK()
+            {
+                if (!_isInitialized) return;
+                try
+                {
+                    LogiSteeringShutdown();
+                    _isInitialized = false;
+                }
+                catch { }
+            }
+
+            public static bool SetOperatingRange(int index, int degrees)
+            {
+                if (!IsDllAvailable) return false;
+                try { return LogiSetOperatingRange(index, degrees); }
+                catch { return false; }
             }
 
             public static bool PlayImpactForce(int index, int magnitudePercentage)
@@ -313,6 +405,13 @@ namespace AutoSim.Vehicle
                 catch { return false; }
             }
 
+            public static bool StopCenteringSpring(int index)
+            {
+                if (!IsDllAvailable) return false;
+                try { return LogiStopSpringForce(index); }
+                catch { return false; }
+            }
+
             public static void StopAllForces(int index)
             {
                 if (!IsDllAvailable) return;
@@ -327,9 +426,14 @@ namespace AutoSim.Vehicle
 #else
             // Safe stubs for UWP / HoloLens 2 ARM64
             public static bool IsDllAvailable => false;
+            public static bool InitializeSDK() => false;
+            public static void UpdateSDK() { }
+            public static void ShutdownSDK() { }
+            public static bool SetOperatingRange(int index, int degrees) => false;
             public static bool PlayImpactForce(int index, int magnitudePercentage) => false;
             public static bool StopBumpyRoad(int index) => false;
             public static bool PlayCenteringSpring(int index, int offset, int saturation, int coefficient) => false;
+            public static bool StopCenteringSpring(int index) => false;
             public static void StopAllForces(int index) { }
 #endif
         }

@@ -34,7 +34,7 @@ namespace AutoSim.Vehicle
 
         [Header("Driver View & Steering")]
         [Tooltip("Driver eye anchor position relative to this car (X=left/right, Y=height, Z=forward/back).")]
-        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.25f, 0.20f);
+        [SerializeField] private Vector3 driverSeatOffset = new Vector3(-0.364f, 1.18f, 0.05f);
 
         [Tooltip("Maximum steering wheel rotation degrees lock-to-lock.")]
         [SerializeField] private float maxSteerDegrees = 450f;
@@ -52,6 +52,7 @@ namespace AutoSim.Vehicle
 
         private Transform steeringWheelTransform;
         private Quaternion initialSteerRot;
+        private bool hasCapturedSteerRot = false;
 
         private VehicleController vehicleController;
 
@@ -244,7 +245,11 @@ namespace AutoSim.Vehicle
                 if (t.name.Equals("SteeringWheel", System.StringComparison.OrdinalIgnoreCase))
                 {
                     steeringWheelTransform = t;
-                    initialSteerRot = t.localRotation;
+                    if (!hasCapturedSteerRot)
+                    {
+                        initialSteerRot = t.localRotation;
+                        hasCapturedSteerRot = true;
+                    }
                     break;
                 }
             }
@@ -258,13 +263,13 @@ namespace AutoSim.Vehicle
                 GameObject anchorObj = new GameObject("DriverSeatAnchor");
                 anchorObj.transform.SetParent(transform, false);
                 anchorObj.transform.localPosition = driverSeatOffset;
-                anchorObj.transform.localRotation = Quaternion.Euler(3.5f, 0f, 0f);
+                anchorObj.transform.localRotation = Quaternion.identity;
                 anchor = anchorObj.transform;
             }
             else
             {
                 anchor.localPosition = driverSeatOffset;
-                anchor.localRotation = Quaternion.Euler(3.5f, 0f, 0f);
+                anchor.localRotation = Quaternion.identity;
             }
         }
 
